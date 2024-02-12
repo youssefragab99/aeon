@@ -155,17 +155,23 @@ class ShapeDTW(BaseClassifier):
         return self
 
     def _calculate_weighting_factor_value(self, X, y):
-        """Calculate the appropriate weighting_factor.
-
-        Check for the compound shape descriptor.
+        """Check for the compound shape descriptor.
         If a value is given, the weighting_factor is set
         as the given value. If not, its tuned via
         a 10-fold cross-validation on the training data.
 
         Parameters
         ----------
-        X : 3D np.ndarray of shape = [n_instances, n_channels, series_length]
-        y - training data classes of shape [n_instances].
+        X : np.ndarray
+            np.ndarray of shape = [n_instances, n_channels, series_length]
+        y :
+            training data classes of shape [n_instances].
+
+        Raises
+        ------
+        ValueError
+            Raises value error if shape descriptor functions
+            are not a string array of length 2.
         """
         self._metric_params = {k.lower(): v for k, v in self._metric_params.items()}
 
@@ -220,40 +226,49 @@ class ShapeDTW(BaseClassifier):
             ]
 
     def _preprocess(self, X):
-        # private method for performing the transformations on
-        # the test/training data. It extracts the subsequences
-        # and then performs the shape descriptor function on
-        # each subsequence.
+        """Private method for perfomring the transformations on
+        the test/training data. It extracts the subsequences
+        and then performs the shape descriptor function on
+        each subsequence.
+
+        Parameters
+        ----------
+        X :
+            Training data
+
+        Returns
+        -------
+        _x :
+            Training data after preprocessing
+        """
         _X = self.sw.transform(X)
         # Feed X into the appropriate shape descriptor function
         _X = self._generate_shape_descriptors(_X)
 
         return _X
 
-    def _predict_proba(self, X) -> np.ndarray:
-        """Perform predictions on the testing data X.
-
-        This function returns the probabilities for each class.
+    def _predict_proba(self, X):
+        """Predict probability for each class.
 
         Parameters
         ----------
-        X : 3D np.ndarray
-            The data to make predictions for, shape = (n_instances, n_channels,
-            n_timepoints).
+        X :
+            Data to be processed into features
 
         Returns
         -------
-        1D np.ndarray
+        np.ndarray
             Predicted probabilities using the ordering in classes_, shape = (
             n_instances, n_classes_).
         """
+
         # Transform the test data in the same way as the training data.
         X = self._preprocess(X)
 
         # Classify the test data
         return self.knn.predict_proba(X)
 
-    def _predict(self, X) -> np.ndarray:
+    def _predict(self, X):
         """Find predictions for all cases in X.
 
         Parameters
@@ -274,12 +289,29 @@ class ShapeDTW(BaseClassifier):
         return self.knn.predict(X)
 
     def _generate_shape_descriptors(self, data):
-        """Generate shape descriptors.
+        """_generate_shape_descriptors Generate the shape description
 
         This function is used to convert a list of
         subsequences into a list of shape descriptors
         to be used for classification.
+
+        Parameters
+        ----------
+        data :
+            Data in list form to be transformed
+
+        Returns
+        -------
+        output;
+            List of shape descriptors
+
+        Raises
+        ------
+        ValueError
+            Throws ValueError if a shape descriptor is not string
+            of length 2 when using 'compound'.
         """
+
         # Get the appropriate transformer objects
         if self.shape_descriptor_function != "compound":
             self.transformer = [self._get_transformer(self.shape_descriptor_function)]
@@ -315,7 +347,7 @@ class ShapeDTW(BaseClassifier):
         return result
 
     def _get_transformer(self, tName):
-        """Extract the appropriate transformer.
+        """_get_transformer Extract the appropriate transformer.
 
         Requires self._metric_params, so only call after fit or in fit after these
         lines of code
@@ -326,18 +358,22 @@ class ShapeDTW(BaseClassifier):
 
         Parameters
         ----------
-        self   : the ShapeDTW object.
-        tName  : the name of the required transformer.
-
+        tName :
+            The name of the required transformer.
         Returns
         -------
-        output : Base Transformer object corresponding to the class
-                 (or classes if its a compound transformer) of the
-                 required transformer. The transformer is
-                 configured with the parameters given in self.metric_params.
+        output:
+            Base Transformer object corresponding to the class
+            (or classes if its a compound transformer) of the
+            required transformer. The transformer is
+            configured with the parameters given in self.metric_params.
 
-        throws : ValueError if a shape descriptor doesn't exist.
+        Raises
+        ------
+        ValueError
+            Throws ValueError if a shape descriptor doesn't exist.
         """
+
         parameters = self._metric_params
         tName = tName.lower()
         if parameters is None:
@@ -368,6 +404,29 @@ class ShapeDTW(BaseClassifier):
             raise ValueError("Invalid shape descriptor function.")
 
     def _get_hog_transformer(self, parameters):
+        """_get_hog_transformer
+
+        Dynamically configures and returns an instance of HOG1DTransformer
+        based on the provided parameters. The Histogram of Oriented Gradients
+        (HOG) is a feature descriptor used for object detection in image
+        processing, tailored here for 1D signals.
+
+        Parameters
+        ----------
+        parameters : dict
+            A dictionary with keys 'num_intervals_hog1d', 'num_bins_hog1d',
+            and 'scaling_factor_hog1d' to specify the configuration of the
+            HOG1DTransformer. Each key corresponds to the number of intervals,
+            number of bins per interval, and the scaling factor for the input
+            signal, respectively.
+
+        Returns
+        -------
+        HOG1DTransformer
+            An instance of HOG1DTransformer configured as per the specified
+            parameters. This object can be used for extracting HOG features
+            from 1D signals.
+        """
         num_intervals = parameters.get("num_intervals_hog1d")
         num_bins = parameters.get("num_bins_hog1d")
         scaling_factor = parameters.get("scaling_factor_hog1d")
